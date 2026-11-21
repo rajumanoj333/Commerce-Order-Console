@@ -1,0 +1,46 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Commerce Order Console</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header><h1>Commerce Order Console</h1></header>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+<main>
+  <section class="card" aria-labelledby="h-cat">
+    <h2 id="h-cat">Catalogue</h2>
+    <table id="catalogue"><thead><tr><th>Product</th><th>Price</th><th>Stock</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card" aria-labelledby="h-new">
+    <h2 id="h-new">New order</h2>
+    <form id="order-form">
+      <label>Customer name <input id="customer" maxlength="100" required></label>
+      <table id="cart"><thead><tr><th>Item</th><th>Qty</th><th>Line</th><th></th></tr></thead><tbody></tbody></table>
+      <p id="cart-empty" class="muted">Add products from the catalogue.</p>
+      <p class="total">Total: <strong id="cart-total">$0.00</strong></p>
+      <div id="order-error" class="error" role="alert" hidden></div>
+      <button type="submit" class="primary">Place order</button>
+    </form>
+  </section>
+
+  <section class="card wide" aria-labelledby="h-orders">
+    <h2 id="h-orders">Orders</h2>
+    <div class="filters">
+      <label>Search reference <input id="search" placeholder="e.g. ORD-0001"></label>
+      <label>Status
+        <select id="status"><option value="">All</option><option>Placed</option><option>Packed</option><option>Shipped</option><option>Cancelled</option></select>
+      </label>
+    </div>
+    <div class="split">
+      <table id="orders"><thead><tr><th>Reference</th><th>Customer</th><th>Total</th><th>Status</th></tr></thead><tbody></tbody></table>
+      <div id="detail" class="detail"><p class="muted">Select an order to see details.</p></div>
+    </div>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
