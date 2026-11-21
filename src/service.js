@@ -101,7 +101,9 @@ class OrderService {
   }
 
   transition(ref, to) {
-    if (!STATUSES.includes(to)) throw new ApiError(400, `Unknown status "${to}"`);
+    if (typeof to !== 'string' || !STATUSES.includes(to)) {
+      throw new ApiError(400, 'Choose a valid order status');
+    }
     return this._commit((draft) => {
       const order = draft.orders.find((x) => x.ref.toLowerCase() === String(ref).toLowerCase());
       if (!order) throw new ApiError(404, `Order ${ref} not found`);

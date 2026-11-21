@@ -1,46 +1,62 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Commerce Order Console</title>
-<link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#184d3d">
+  <title>Order desk | Stockroom</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
 </head>
 <body>
-<header><h1>Commerce Order Console</h1></header>
-<div id="toast" role="status" aria-live="polite" hidden></div>
-<main>
-  <section class="card" aria-labelledby="h-cat">
-    <h2 id="h-cat">Catalogue</h2>
-    <table id="catalogue"><thead><tr><th>Product</th><th>Price</th><th>Stock</th><th></th></tr></thead><tbody></tbody></table>
+<a class="skip" href="#main">Skip to workspace</a>
+<header class="top"><div class="bar">
+  <a class="brand" href="#desk" aria-label="Stockroom home"><span class="brand-icon" data-icon="box"></span>Stockroom</a>
+  <nav aria-label="Workspace"><a href="#desk" id="desk-link" class="active"><i data-icon="grid"></i>Order desk</a><a href="#orders" id="orders-link"><i data-icon="list"></i>Orders</a></nav>
+  <span id="connection" class="connection"><span class="dot"></span><span id="connection-label">Connecting</span></span>
+</div></header>
+<main id="main" tabindex="-1">
+  <section class="banner">
+    <div class="banner-text"><span class="banner-label"><span class="mini-line"></span> STORE OPERATIONS</span><h1 id="page-title">Order desk</h1><p id="page-intro">Browse the catalogue and build a customer order.</p></div>
+    <svg class="banner-art" viewBox="0 0 360 148" aria-hidden="true" fill="none">
+      <defs><pattern id="gridlines" width="19" height="19" patternUnits="userSpaceOnUse"><path d="M19 0H0V19" stroke="#95c6a7" stroke-opacity=".18"/></pattern></defs>
+      <path fill="url(#gridlines)" d="M0 0h360v148H0z"/>
+      <g stroke="#aed7af" stroke-width="1.45" stroke-linejoin="round">
+      <path fill="#2a5d47" d="m125 68 65-32 70 31-67 34z"/><path fill="#23553f" d="m125 68 68 33v54l-68-33z"/><path fill="#1a4736" d="m193 101 67-34v54l-67 34z"/>
+      <path fill="#659073" d="m147 57 19-9 70 31-18 9z"/><path fill="#497258" d="m218 88 18-9v20l-6 1-5 6-7 1z"/>
+      <path d="m137 98 21 10m-21-5 15 7m-15 2 21 10" opacity=".75"/>
+      <path fill="#37684d" d="m195 28 43-21 49 22-44 22z"/><path fill="#295941" d="m195 28 48 23v37l-48-24z"/><path fill="#214c37" d="m243 51 44-22v37l-44 22z"/>
+      <path fill="#709575" d="m211 20 11-5 49 22-12 6z"/><path fill="#5d8164" d="m259 43 12-6v12l-5 1-7 5z"/>
+      <path d="m207 49 16 8m-16-3 11 5"/>
+      <path fill="#37684d" d="m276 102 43-21 44 20-44 22z"/><path fill="#295941" d="m276 102 43 21v37l-43-21z"/><path fill="#214c37" d="m319 123 44-22v37l-44 22z"/>
+      <path d="m291 95 44 21v13l9-4v-13l-44-21"/>
+      </g>
+      <g stroke="#d2e6ac" stroke-width="1.5"><path d="M115 31h8m-4-4v8M299 67h8m-4-4v8M90 109h7m-3.5-3.5v7"/></g>
+    </svg>
   </section>
-
-  <section class="card" aria-labelledby="h-new">
-    <h2 id="h-new">New order</h2>
-    <form id="order-form">
-      <label>Customer name <input id="customer" maxlength="100" required></label>
-      <table id="cart"><thead><tr><th>Item</th><th>Qty</th><th>Line</th><th></th></tr></thead><tbody></tbody></table>
-      <p id="cart-empty" class="muted">Add products from the catalogue.</p>
-      <p class="total">Total: <strong id="cart-total">$0.00</strong></p>
-      <div id="order-error" class="error" role="alert" hidden></div>
-      <button type="submit" class="primary">Place order</button>
-    </form>
-  </section>
-
-  <section class="card wide" aria-labelledby="h-orders">
-    <h2 id="h-orders">Orders</h2>
-    <div class="filters">
-      <label>Search reference <input id="search" placeholder="e.g. ORD-0001"></label>
-      <label>Status
-        <select id="status"><option value="">All</option><option>Placed</option><option>Packed</option><option>Shipped</option><option>Cancelled</option></select>
-      </label>
-    </div>
-    <div class="split">
-      <table id="orders"><thead><tr><th>Reference</th><th>Customer</th><th>Total</th><th>Status</th></tr></thead><tbody></tbody></table>
-      <div id="detail" class="detail"><p class="muted">Select an order to see details.</p></div>
-    </div>
-  </section>
+  <div id="load-error" class="feedback" role="alert" hidden></div>
+  <div id="desk" class="layout">
+    <section aria-labelledby="catalogue-title" class="catalogue"><div class="section-head"><div class="heading-line"><h2 id="catalogue-title">Product catalogue</h2><span class="count" id="product-count">0</span></div></div>
+      <div class="tools"><label class="search-box"><i data-icon="search"></i><input type="search" id="product-search" placeholder="Search products..." aria-label="Search products"></label><label class="select-wrap"><i data-icon="sliders"></i><select id="stock-filter" aria-label="Filter catalogue by stock"><option value="">All stock</option><option value="available">In stock</option><option value="out">Out of stock</option></select></label></div>
+      <div id="products" class="products" aria-live="polite"></div>
+    </section>
+    <aside class="panel ticket" aria-labelledby="cart-title">
+      <div class="ticket-head"><div class="heading-line"><span class="ticket-icon" data-icon="receipt"></span><h2 id="cart-title">Current order</h2></div><span class="count" id="cart-count">0 items</span></div>
+      <form id="order-form">
+        <div class="customer-field"><label for="customer">Customer name</label><div class="search-box"><i data-icon="user"></i><input id="customer" required maxlength="100" autocomplete="name" placeholder="Enter customer name"></div></div>
+        <div id="cart"></div>
+        <div class="checkout"><div class="total-line"><span>Order total</span><strong id="cart-total">$0.00</strong></div><div id="order-error" class="feedback" role="alert" hidden></div><button class="primary checkout-btn" type="submit" id="place-order" disabled><i data-icon="check"></i>Place order</button></div>
+      </form>
+    </aside>
+  </div>
+  <div id="orders" class="layout orders-layout" hidden>
+    <section class="catalogue"><div class="section-head"><div class="heading-line"><h2>Order list</h2><span class="count" id="order-count">0</span></div></div>
+      <div class="tools"><label class="search-box"><i data-icon="search"></i><input type="search" id="search" placeholder="Search order reference..." aria-label="Search order reference"></label><label class="select-wrap"><i data-icon="sliders"></i><select id="status" aria-label="Filter orders by status"><option value="">All statuses</option><option>Placed</option><option>Packed</option><option>Shipped</option><option>Cancelled</option></select></label></div>
+      <div id="order-list"></div>
+    </section>
+    <aside class="panel ticket"><div class="ticket-head"><div class="heading-line"><span class="ticket-icon" data-icon="receipt"></span><h2>Order details</h2></div></div><div id="detail"></div></aside>
+  </div>
 </main>
-<script src="app.js"></script>
-</body>
-</html>
+<button class="mobile-cart primary" id="mobile-cart" type="button" hidden><i data-icon="bag"></i><span></span></button>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+</body></html>

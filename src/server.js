@@ -1,55 +1,76 @@
 ﻿const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { JsonStore } = require('./store');
-const { OrderService, ApiError, TRANSITIONS } = require('./service');
+const { JsonStore, prepareDataFile } = require('./store');
+const { OrderService, ApiError } = require('./service');
+const { dispatch } = require('./api');
 const { seedState } = require('./seed');
 
 const PUBLIC = path.join(__dirname, '..', 'public');
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
+const TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
+};
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
-    let data = '';
-    req.on('data', (c) => {
-      data += c;
-      if (data.length > 1e6) { reject(new ApiError(413, 'Body too large')); req.destroy(); }
+    const chunks = [];
+    let size = 0;
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > 1e6) {
+        chunks.length = 0;
+        reject(new ApiError(413, 'Body too large'));
+        return;
+      }
+      chunks.push(chunk);
     });
     req.on('end', () => {
-      if (!data) return resolve({});
-      try { resolve(JSON.parse(data)); } catch { reject(new ApiError(400, 'Invalid JSON')); }
+      if (size > 1e6) return;
+      try {
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        if (!body || typeof body !== 'object' || Array.isArray(body)) {
+          throw new Error();
+        }
+        resolve(body);
+      } catch {
+        reject(new ApiError(400, 'Request body must be a JSON object'));
+      }
     });
+    req.on('error', reject);
   });
 }
 
 function createServer(service) {
   return http.createServer(async (req, res) => {
     const send = (status, body) => {
-      res.writeHead(status, { 'Content-Type': 'application/json' });
+      res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify(body));
     };
     try {
       const url = new URL(req.url, 'http://localhost');
-      const p = url.pathname;
+      let p;
+      try {
+        p = decodeURIComponent(url.pathname);
+      } catch {
+        throw new ApiError(400, 'Invalid URL encoding');
+      }
       if (p.startsWith('/api/')) {
-        if (req.method === 'GET' && p === '/api/products') return send(200, service.listProducts());
-        if (req.method === 'GET' && p === '/api/transitions') return send(200, TRANSITIONS);
-        if (req.method === 'GET' && p === '/api/orders') {
-          return send(200, service.listOrders({ q: url.searchParams.get('q'), status: url.searchParams.get('status') }));
-        }
-        if (req.method === 'POST' && p === '/api/orders') return send(201, service.placeOrder(await readBody(req)));
-        let m = p.match(/^\/api\/orders\/([^/]+)$/);
-        if (req.method === 'GET' && m) return send(200, service.getOrder(decodeURIComponent(m[1])));
-        m = p.match(/^\/api\/orders\/([^/]+)\/status$/);
-        if (req.method === 'POST' && m) {
-          const body = await readBody(req);
-          return send(200, service.transition(decodeURIComponent(m[1]), body.status));
-        }
-        throw new ApiError(404, 'Not found');
+        const body = req.method === 'POST' ? await readBody(req) : undefined;
+        const result = dispatch(service, req.method, p, url.searchParams, body);
+        return send(result.status, result.body);
       }
       if (req.method !== 'GET') throw new ApiError(405, 'Method not allowed');
-      const file = path.join(PUBLIC, p === '/' ? 'index.html' : path.normalize(p));
-      if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) throw new ApiError(404, 'Not found');
+      const file = path.resolve(PUBLIC, p === '/' ? 'index.html' : '.' + p);
+      if (!file.startsWith(PUBLIC + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) throw new ApiError(404, 'Not found');
       res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
       fs.createReadStream(file).pipe(res);
     } catch (e) {
@@ -63,8 +84,12 @@ function createServer(service) {
 module.exports = { createServer };
 
 if (require.main === module) {
-  const file = process.env.DATA_FILE || path.join(__dirname, '..', 'data', 'db.json');
+  const file = prepareDataFile();
   const service = new OrderService(new JsonStore(file), seedState);
-  const port = process.env.PORT || 3000;
-  createServer(service).listen(port, () => console.log(`Order console on http://localhost:${port}`));
+  const host = '127.0.0.1';
+  const port = Number(process.env.PORT || 3000);
+  const server = createServer(service);
+  server.listen(port, host, () => {
+    console.log(`Order console on http://${host}:${server.address().port}`);
+  });
 }

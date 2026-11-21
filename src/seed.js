@@ -14,13 +14,16 @@ function seedState() {
 }
 
 function seed(file) {
-  new JsonStore(file).save(seedState());
+  const store = new JsonStore(file);
+  if (store.exists()) return false;
+  store.save(seedState());
+  return true;
 }
 
 module.exports = { seedState, seed };
 
 if (require.main === module) {
-  const file = process.env.DATA_FILE || require('node:path').join(__dirname, '..', 'data', 'db.json');
-  seed(file);
-  console.log('Seeded', file);
+  const file = require('./store').prepareDataFile();
+  const created = seed(file);
+  console.log(created ? 'Seeded' : 'Found existing store at', file);
 }

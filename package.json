@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "commerce-order-console",
   "version": "1.0.0",
   "private": true,
@@ -8,6 +8,10 @@
     "start": "node src/server.js",
     "test": "node --test \"test/*.test.js\""
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.9.0"
+  }
 }
-

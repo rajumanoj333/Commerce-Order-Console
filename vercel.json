@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "outputDirectory": "public",
+  "rewrites": [
+    { "source": "/api/products", "destination": "/api/stockroom?route=products" },
+    { "source": "/api/transitions", "destination": "/api/stockroom?route=transitions" },
+    { "source": "/api/orders", "destination": "/api/stockroom?route=orders" },
+    { "source": "/api/orders/:ref", "destination": "/api/stockroom?route=orders/:ref" },
+    { "source": "/api/orders/:ref/status", "destination": "/api/stockroom?route=orders/:ref/status" }
+  ]
+}

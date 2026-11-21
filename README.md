@@ -1,60 +1,86 @@
-﻿# Commerce Order Console
+# Stockroom
 
-A browser console for phone-order staff to create, find, and fulfil orders. Zero runtime dependencies: Node.js (>= 20) only. No database server is needed. Data lives in a single JSON file (`data/db.json`), written atomically, so orders and stock survive restarts.
+Stockroom is a browser console for taking phone orders and tracking fulfilment. Try the [public demo](https://commerce-order-console.vercel.app/) or watch the [30-second video walkthrough](https://commerce-order-console.vercel.app/stockroom-demo.mp4).
 
-## Run
+The public demo uses a synthetic catalogue and a shared order list. Use fictional customer names. Hosted orders persist in a private Vercel Blob store. Each change checks the stored version and retries against fresh stock if another request wins the write. Local mode uses Node.js built-ins and saves orders on your machine.
 
-```bash
-npm run seed    # optional: (re)create data/db.json with the sample catalogue (resets all data)
-npm start       # http://localhost:3000
-npm test        # automated tests
+## Run on this computer
+
+From the project directory, with Node.js 20 or later installed:
+
+```sh
+npm run seed
+npm start
 ```
 
-If `data/db.json` is missing, `npm start` seeds it automatically. Set `PORT` or `DATA_FILE` to override defaults.
+Open **http://127.0.0.1:3000**. Leave the terminal running while using the desk and press Ctrl+C to stop it. Startup also initializes the store automatically. Running the seed command again preserves your orders and current stock.
 
-## Seed catalogue
+The server listens on the IPv4 loopback interface. The default Windows data file is `%LOCALAPPDATA%\Stockroom\orders.json`. On Linux and macOS the default is `~/.local/share/stockroom/orders.json`. On first use, an existing workspace store at `data/db.json` is carried forward. The original file is retained. Future saves use the local application data file. You may copy the file while the server is stopped to make a backup.
 
-| Product | Stock |
-|---|---|
-| P-A Ceramic Mug | 5 |
-| P-B Travel Flask | **0 (out of stock)** |
-| P-C Canvas Tote Bag | 40 |
-| P-D Notebook (A5) | 120 |
-| P-E Desk Lamp | 8 |
-| P-F Wireless Mouse | 15 |
+To try a fresh catalogue separately on Windows, run these commands in another PowerShell terminal:
 
-## API
+```powershell
+$env:DATA_FILE = Join-Path $env:LOCALAPPDATA 'Stockroom/demo-orders.json'
+$env:PORT = '3100'
+npm start
+```
+
+Open http://127.0.0.1:3100. Each instance needs its own file. Choose an unused local filename for a fresh run.
+
+## Two-minute walkthrough
+
+1. On **Order desk**, search for **Ceramic Mug** and add two. Clear the search and add one **Canvas Tote Bag**. The order total is **$31.99**. The **Travel Flask** shows zero stock and cannot be added.
+2. Enter a customer name and choose **Place order**. Keep the assigned reference. In a fresh store, mug stock drops from five to three and tote stock drops from forty to thirty-nine.
+3. Open **Orders**, search for the reference, and open the order. Check the quantities, line totals, customer, and **Placed** status.
+4. Mark it **Packed**. Filter the order list to **Packed** to see orders ready to ship. Choose **Cancel order** to return both products to stock. The cancelled order retains its history.
+5. Place another order and move it through **Packed** to **Shipped**. Restart the server using the same file. Search for the reference again to check the saved status.
+
+[View the order desk](docs/order-desk.png) · [View a packed order](docs/packed-order.png)
+
+## Verify
+
+```sh
+npm test
+```
+
+Run `npm ci` before `npm test` to install the hosted storage SDK. Tests run with temporary stores and a simulated Blob store. They cover multi-item placement, totals, the mixed-stock rollback example, stock restoration on cancellation, repeated cancellation, forbidden transitions, reference search, filtering, input validation, restart persistence, and concurrent requests.
+
+## How consistency works
+
+The browser submits product IDs and quantities. The server calculates prices from its catalogue, combines duplicate product lines, and validates the entire order. A single in-memory transaction computes the order and stock changes together. The server writes and flushes the complete state to a temporary file, renames it into place, and then adopts that state in memory. All writes run synchronously in one Node process. Run one server process per data file.
+
+| Current status | Allowed next statuses |
+| --- | --- |
+| Placed | Packed, Cancelled |
+| Packed | Shipped, Cancelled |
+| Shipped | None |
+| Cancelled | None |
+
+Cancellation restores stock in the same write that records the status and its timestamp. A second cancellation returns HTTP 409.
+
+## Local API
 
 | Method | Path | Purpose |
-|---|---|---|
-| GET | `/api/products` | Catalogue with stock |
-| GET | `/api/orders?q=ORD-0001&status=Placed` | List, search by reference, filter by status |
-| GET | `/api/orders/:ref` | Order detail |
-| POST | `/api/orders` | `{customer, items:[{productId, quantity}]}`. 201, 400 invalid, 409 unavailable stock |
-| POST | `/api/orders/:ref/status` | `{status}`. 409 on an invalid transition |
+| --- | --- | --- |
+| GET | /api/products | Current catalogue and stock |
+| GET | /api/orders?q=ORD&status=Packed | Search references and filter by status |
+| GET | /api/orders/:ref | Order, line items, and history |
+| GET | /api/transitions | Allowed next statuses |
+| POST | /api/orders | Place an order |
+| POST | /api/orders/:ref/status | Apply a status change |
 
-## Rules (enforced server-side in `src/service.js`)
+Example order body:
 
-- Transitions: Placed -> Packed -> Shipped. Cancel from Placed or Packed only. Anything else returns 409.
-- Placement is all-or-nothing. Every line is checked against stock on a copy of the state, and the copy is saved and swapped in only if all lines pass. One unavailable item rejects the whole order with per-item details, and stock is unchanged.
-- Stock is restored only inside the Cancelled transition. A repeat cancel fails the transition check, so stock cannot be restored twice.
-- Duplicate lines for the same product are merged before the stock check.
-- Requests are handled synchronously in one process, so there are no races between check and deduct.
+```json
+{"customer":"Alex","items":[{"productId":"P-A","quantity":2},{"productId":"P-B","quantity":1}]}
+```
 
-## Walkthrough
+With the seed catalogue this request returns HTTP 409 because P-B has zero stock. The server leaves all product quantities and the order list unchanged. To place a successful order, use only the P-A line. To pack it, send `{"status":"Packed"}` to its status endpoint.
 
-1. Catalogue (top left) shows stock. Flask shows "Out of stock" and its Add button is disabled.
-2. Click Add on Ceramic Mug twice, enter a customer name, and Place order. Stock drops from 5 to 3 and the order appears in the list.
-3. Select the order. Detail shows items, quantities, total, status, history, and only the valid next actions.
-4. Click Cancel order. Stock returns to 5, and the Cancel button is gone.
-5. Server-side rejection (the UI disables the out-of-stock item, but the API still rejects it):
-   `curl -X POST localhost:3000/api/orders -H "Content-Type: application/json" -d '{"customer":"X","items":[{"productId":"P-A","quantity":2},{"productId":"P-B","quantity":1}]}'` returns 409, Mug stays at 5, no order is created.
-6. Stop and restart `npm start`. Orders and stock are unchanged.
+## Source map
 
-## Tests
-
-`test/orders.test.js` covers successful placement (with restart persistence), insufficient stock with no side effects, invalid transitions, exactly-once restore, search/filter, and HTTP status codes.
-
-## Free deployment
-
-Any free Node host works (Render, Railway, Fly.io free tiers). Use a persistent disk for `DATA_FILE`. Free tiers with ephemeral disks lose data on redeploy, so use a host with a persistent volume. A database is not required for local or single-instance use.
+- `public/` contains the browser interface and six local product photographs.
+- `src/server.js` serves the UI and API. `src/service.js` enforces placement and fulfilment rules.
+- `src/store.js` and `src/seed.js` handle persistence and catalogue initialization.
+- `test/orders.test.js` contains the automated checks.
+- [design.md](design.md) documents the interface and interaction decisions.
